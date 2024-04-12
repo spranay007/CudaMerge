@@ -1,0 +1,6 @@
+﻿  Compiling CUDA source file CudaMerge.cu...
+  
+  E:\College\Multicore Gpu\CudaMerge>"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.3\bin\nvcc.exe" -gencode=arch=compute_52,code=\"sm_52,compute_52\" --use-local-env -ccbin "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.39.33519\bin\HostX64\x64" -x cu   -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.3\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.3\include"  -G   --keep-dir CudaMerge\x64\Debug  -maxrregcount=0   --machine 64 --compile -cudart static  -g  -DWIN32 -DWIN64 -D_DEBUG -D_CONSOLE -D_MBCS -Xcompiler "/EHsc /W3 /nologo /Od /FS /Zi /RTC1 /MDd " -Xcompiler "/FdCudaMerge\x64\Debug\vc143.pdb" -o "E:\College\Multicore Gpu\CudaMerge\CudaMerge\x64\Debug\CudaMerge.cu.obj" "E:\College\Multicore Gpu\CudaMerge\CudaMerge.cu" 
+  CudaMerge.cu
+  tmpxft_00001a88_00000000-7_CudaMerge.cudafe1.cpp
+  Project_one.vcxproj -> E:\College\Multicore Gpu\CudaMerge\x64\Debug\CudaMerge.exe
