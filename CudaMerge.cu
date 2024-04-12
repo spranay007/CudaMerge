@@ -26,7 +26,8 @@ void mergesort(long*, long, dim3, dim3);
 // A[]. B[], size, width, slices, nThreads
 __global__ void gpu_mergesort(long*, long*, long, long, long, dim3*, dim3*);
 __device__ void gpu_bottomUpMerge(long*, long*, long, long, long);
-
+void cpu_mergesort(long* data, long size);
+void merge(long* result, long* left, long* right, long size_left, long size_right);
 
 // profiling
 long long tm();
@@ -161,20 +162,56 @@ int main(int argc, char** argv) {
         std::cout << "sorting " << size << " numbers\n\n";
 
     // merge-sort the data
+    //mergesort(data, size, threadsPerBlock, blocksPerGrid);
+    // Copy data for CPU merge sort
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    long* cpu_data = new long[size];
+    std::copy(data, data + size, cpu_data);
+
+    // Perform GPU merge-sort
+    auto gpu_sort_start = std::chrono::steady_clock::now();
     mergesort(data, size, threadsPerBlock, blocksPerGrid);
+    auto gpu_sort_end = std::chrono::steady_clock::now();
+    auto gpu_sort_time = std::chrono::duration_cast<std::chrono::microseconds>(gpu_sort_end - gpu_sort_start).count();
 
-    tm();
+    // Perform CPU merge-sort
+    auto cpu_sort_start = std::chrono::steady_clock::now();
+    cpu_mergesort(cpu_data, size);
+    auto cpu_sort_end = std::chrono::steady_clock::now();
+    auto cpu_sort_time = std::chrono::duration_cast<std::chrono::microseconds>(cpu_sort_end - cpu_sort_start).count();
 
-    //
-    // Print out the list
-    //
+    // Print sorted arrays
+    std::cout << "GPU Sorted Array:\n";
     for (int i = 0; i < size; i++) {
         std::cout << data[i] << '\n';
     }
 
-    if (verbose) {
-        std::cout << "print list to stdout: " << tm() << " microseconds\n";
+    std::cout << "\nCPU Sorted Array:\n";
+    for (int i = 0; i < size; i++) {
+        std::cout << cpu_data[i] << '\n';
     }
+
+    // Print execution times
+    std::cout << "\nGPU Sorting Time: " << gpu_sort_time << " microseconds\n";
+    std::cout << "CPU Sorting Time: " << cpu_sort_time << " microseconds\n";
+
+    // Cleanup
+    delete[] data;
+    delete[] cpu_data;
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    
+    //tm();
+
+    //
+    // Print out the list
+    //
+    //for (int i = 0; i < size; i++) {
+    //    std::cout << data[i] << '\n';
+    //}
+
+    //if (verbose) {
+    //    std::cout << "print list to stdout: " << tm() << " microseconds\n";
+   // }
 }
 
 void mergesort(long* data, long size, dim3 threadsPerBlock, dim3 blocksPerGrid) {
@@ -380,3 +417,38 @@ long long tm() {
     return t;
 }
 
+// CPU-based merge sort
+void cpu_mergesort(long* data, long size) {
+    if (size <= 1)
+        return;
+
+    long mid = size / 2;
+
+    cpu_mergesort(data, mid);
+    cpu_mergesort(data + mid, size - mid);
+
+    // Merge the two sorted halves
+    merge(data, data, data + mid, mid, size - mid);
+}
+
+// Merge function for CPU merge sort
+void merge(long* result, long* left, long* right, long size_left, long size_right) {
+    long i = 0, j = 0, k = 0;
+    std::vector<long> merged(size_left + size_right);
+
+    while (i < size_left && j < size_right) {
+        if (left[i] <= right[j])
+            merged[k++] = left[i++];
+        else
+            merged[k++] = right[j++];
+    }
+
+    while (i < size_left)
+        merged[k++] = left[i++];
+
+    while (j < size_right)
+        merged[k++] = right[j++];
+
+    // Copy the merged array back to the result
+    std::copy(merged.begin(), merged.end(), result);
+}
