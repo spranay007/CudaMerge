@@ -8,20 +8,22 @@
 #include <vector>
 #include <cstdlib>
 #include <chrono>
+#include <algorithm>
+#include <random>
 
-/**
- * mergesort.cu
- * a one-file c++ / cuda program for performing mergesort on the GPU
- * While the program execution is fairly slow, most of its runnning time
- *  is spent allocating memory on the GPU.
- * For a more complex program that performs many calculations,
- *  running on the GPU may provide a significant boost in performance
- */
+#define BLOCK_SIZE 256
 
- // helper for main()
+// mergesort.cu
+// a one-file c++ / cuda program for performing mergesort on the GPU
+// While the program execution is fairly slow, most of its runnning time
+// is spent allocating memory on the GPU.
+// For a more complex program that performs many calculations,
+// running on the GPU may provide a significant boost in performance
+
+// helper for main()
 long readList(long**);
 
-// data[], size, threads, blocks, 
+// data[], size, threads, blocks,
 void mergesort(long*, long, dim3, dim3);
 // A[]. B[], size, width, slices, nThreads
 __global__ void gpu_mergesort(long*, long*, long, long, long, dim3*, dim3*);
@@ -33,6 +35,17 @@ void merge(long* result, long* left, long* right, long size_left, long size_righ
 long long tm();
 
 #define min(a, b) (a < b ? a : b)
+
+// Generate random numbers
+void generateRandomNumbers(std::vector<long>& numbers, long size) {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<long> dis(1, 1000);
+
+    for (long i = 0; i < size; ++i) {
+        numbers.push_back(dis(gen));
+    }
+}
 
 void printHelp(char* program) {
 
@@ -72,11 +85,10 @@ void printHelp(char* program) {
 
 bool verbose;
 int main(int argc, char** argv) {
-
     dim3 threadsPerBlock;
     dim3 blocksPerGrid;
 
-    threadsPerBlock.x = 32;
+    threadsPerBlock.x = BLOCK_SIZE;
     threadsPerBlock.y = 1;
     threadsPerBlock.z = 1;
 
@@ -84,14 +96,14 @@ int main(int argc, char** argv) {
     blocksPerGrid.y = 1;
     blocksPerGrid.z = 1;
 
-    //
+    bool verbose = false;
+
     // Parse argv
-    //
-    tm();
+    /*
     for (int i = 1; i < argc; i++) {
         if (argv[i][0] == '-' && argv[i][1] && !argv[i][2]) {
             char arg = argv[i][1];
-            unsigned int* toSet = 0;
+            unsigned int* toSet = nullptr;
             switch (arg) {
             case 'x':
                 toSet = &threadsPerBlock.x;
@@ -122,7 +134,7 @@ int main(int argc, char** argv) {
 
             if (toSet) {
                 i++;
-                *toSet = (unsigned int)strtol(argv[i], 0, 10);
+                *toSet = static_cast<unsigned int>(strtol(argv[i], nullptr, 10));
             }
         }
         else {
@@ -136,7 +148,6 @@ int main(int argc, char** argv) {
     }
 
     if (verbose) {
-        std::cout << "parse argv " << tm() << " microseconds\n";
         std::cout << "\nthreadsPerBlock:"
             << "\n  x: " << threadsPerBlock.x
             << "\n  y: " << threadsPerBlock.y
@@ -150,68 +161,41 @@ int main(int argc, char** argv) {
             blocksPerGrid.x * blocksPerGrid.y * blocksPerGrid.z
             << "\n\n";
     }
-
-    //
-    // Read numbers from stdin
-    //
-    long* data;
-    long size = readList(&data);
-    if (!size) return -1;
-
-    if (verbose)
-        std::cout << "sorting " << size << " numbers\n\n";
-
-    // merge-sort the data
-    //mergesort(data, size, threadsPerBlock, blocksPerGrid);
-    // Copy data for CPU merge sort
-    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    long* cpu_data = new long[size];
-    std::copy(data, data + size, cpu_data);
-
-    // Perform GPU merge-sort
-    auto gpu_sort_start = std::chrono::steady_clock::now();
-    mergesort(data, size, threadsPerBlock, blocksPerGrid);
-    auto gpu_sort_end = std::chrono::steady_clock::now();
-    auto gpu_sort_time = std::chrono::duration_cast<std::chrono::microseconds>(gpu_sort_end - gpu_sort_start).count();
-
-    // Perform CPU merge-sort
-    auto cpu_sort_start = std::chrono::steady_clock::now();
-    cpu_mergesort(cpu_data, size);
-    auto cpu_sort_end = std::chrono::steady_clock::now();
-    auto cpu_sort_time = std::chrono::duration_cast<std::chrono::microseconds>(cpu_sort_end - cpu_sort_start).count();
-
-    // Print sorted arrays
-    std::cout << "GPU Sorted Array:\n";
-    for (int i = 0; i < size; i++) {
-        std::cout << data[i] << '\n';
+    */
+    // Check if the number of numbers is provided
+    if (argc < 2) {
+        std::cout << "Number of numbers not provided.\n";
+        return -1;
     }
 
-    std::cout << "\nCPU Sorted Array:\n";
-    for (int i = 0; i < size; i++) {
-        std::cout << cpu_data[i] << '\n';
+    long size = std::atol(argv[1]);
+    if (size <= 0) {
+        std::cout << "Invalid number of numbers.\n";
+        return -1;
     }
 
-    // Print execution times
-    std::cout << "\nGPU Sorting Time: " << gpu_sort_time << " microseconds\n";
+    // Generate random numbers
+    std::vector<long> numbers;
+    generateRandomNumbers(numbers, size);
+
+    // GPU Sorting
+    auto start_gpu = std::chrono::steady_clock::now();
+    // Perform GPU mergesort
+    mergesort(numbers.data(), size, threadsPerBlock, blocksPerGrid);
+    auto end_gpu = std::chrono::steady_clock::now();
+    auto gpu_sort_time = std::chrono::duration_cast<std::chrono::microseconds>(end_gpu - start_gpu).count();
+
+    // CPU Sorting
+    auto start_cpu = std::chrono::steady_clock::now();
+    // Perform CPU mergesort
+    cpu_mergesort(numbers.data(), size);
+    auto end_cpu = std::chrono::steady_clock::now();
+    auto cpu_sort_time = std::chrono::duration_cast<std::chrono::microseconds>(end_cpu - start_cpu).count();
+
+    std::cout << "GPU Sorting Time: " << gpu_sort_time << " microseconds\n";
     std::cout << "CPU Sorting Time: " << cpu_sort_time << " microseconds\n";
 
-    // Cleanup
-    delete[] data;
-    delete[] cpu_data;
-    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    
-    //tm();
-
-    //
-    // Print out the list
-    //
-    //for (int i = 0; i < size; i++) {
-    //    std::cout << data[i] << '\n';
-    //}
-
-    //if (verbose) {
-    //    std::cout << "print list to stdout: " << tm() << " microseconds\n";
-   // }
+    return 0;
 }
 
 void mergesort(long* data, long size, dim3 threadsPerBlock, dim3 blocksPerGrid) {
@@ -335,17 +319,28 @@ __global__ void gpu_mergesort(long* source, long* dest, long size, long width, l
 // gets called by gpu_mergesort() for each slice
 //
 __device__ void gpu_bottomUpMerge(long* source, long* dest, long start, long middle, long end) {
-    long i = start;
-    long j = middle;
+    __shared__ long shared[BLOCK_SIZE];
+    long i = start + threadIdx.x;
+    long j = middle + threadIdx.x;
+    long index = start + threadIdx.x;
+
+    // Load the data to shared memory
+    if (i < middle) shared[threadIdx.x] = source[i];
+    else shared[threadIdx.x] = 0;
+
+    __syncthreads();
+
+    // Merge
     for (long k = start; k < end; k++) {
-        if (i < middle && (j >= end || source[i] < source[j])) {
-            dest[k] = source[i];
+        if (i < middle && (j >= end || shared[threadIdx.x] < source[j])) {
+            dest[index] = shared[threadIdx.x];
             i++;
         }
         else {
-            dest[k] = source[j];
+            dest[index] = source[j];
             j++;
         }
+        index += blockDim.x;
     }
 }
 
