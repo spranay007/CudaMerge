@@ -13,27 +13,19 @@
 
 #define THREADS_PER_BLOCK 256
 
-/**
- * mergesort.cu
- * a one-file c++ / cuda program for performing mergesort on the GPU
- * While the program execution is fairly slow, most of its running time
- * is spent allocating memory on the GPU.
- * For a more complex program that performs many calculations,
- * running on the GPU may provide a significant boost in performance
- */
-
- // helper for main()
+// Helper for main()
 long readList(long**);
 
-// data[], size, threads
+// Data[], size, threads
 void mergesort(long*, long, dim3);
-// A[]. B[], size, width, slices, nThreads
+// A[], B[], size, width, slices
 __global__ void gpu_mergesort(long*, long*, long, long, long);
 __device__ void gpu_bottomUpMerge(long*, long*, long, long, long);
-void cpu_mergesort(long* data, long size);
-void merge(long* result, long* left, long* right, long size_left, long size_right);
+void cpu_mergesort(long*, long);
+void merge(long*, long*, long*, long, long);
+bool compareArrays(long* arr1, long* arr2, long size);
 
-// profiling
+// Profiling
 long long tm();
 
 #define min(a, b) (a < b ? a : b)
@@ -54,8 +46,6 @@ void printHelp(char* program) {
 }
 
 int main(int argc, char** argv) {
-    dim3 threadsPerBlock(THREADS_PER_BLOCK, 1, 1);
-
     // Check if the number of elements is provided
     if (argc < 2) {
         std::cout << "Number of elements not provided.\n";
@@ -69,11 +59,15 @@ int main(int argc, char** argv) {
         return -1;
     }
 
+    dim3 threadsPerBlock(THREADS_PER_BLOCK, 1, 1);
+    dim3 blocksPerGrid((size + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, 1, 1);
+
     // Generate random numbers
     std::vector<long> numbers;
     generateRandomNumbers(numbers, size);
 
-    dim3 blocksPerGrid((size + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, 1, 1);
+    long* cpu_result = new long[size];
+    long* gpu_result = new long[size];
 
     // GPU Sorting
     auto start_gpu = std::chrono::steady_clock::now();
@@ -92,6 +86,18 @@ int main(int argc, char** argv) {
     std::cout << "GPU Sorting Time: " << gpu_sort_time << " microseconds\n";
     std::cout << "CPU Sorting Time: " << cpu_sort_time << " microseconds\n";
 
+    cudaMemcpy(gpu_result, numbers.data(), size * sizeof(long), cudaMemcpyHostToDevice);
+
+    if (compareArrays(cpu_result, gpu_result, size)) {
+        std::cout << "Results matched\n";
+    }
+    else {
+        std::cout << "Results did not match\n";
+    }
+
+    delete[] cpu_result;
+    delete[] gpu_result;
+
     return 0;
 }
 
@@ -104,7 +110,7 @@ void mergesort(long* data, long size, dim3 threadsPerBlock) {
 
     checkCudaErrors(cudaMemcpy(D_data, data, size * sizeof(long), cudaMemcpyHostToDevice));
 
-    gpu_mergesort << <1, threadsPerBlock >> > (D_data, D_swp, size, 2, 1);
+    gpu_mergesort << <1, threadsPerBlock, size * sizeof(long) >> > (D_data, D_swp, size, 2, 1);
 
     checkCudaErrors(cudaMemcpy(data, D_data, size * sizeof(long), cudaMemcpyDeviceToHost));
 
@@ -113,6 +119,8 @@ void mergesort(long* data, long size, dim3 threadsPerBlock) {
 }
 
 __global__ void gpu_mergesort(long* source, long* dest, long size, long width, long slices) {
+    extern __shared__ long shared_data[];
+
     unsigned int idx = threadIdx.x + blockIdx.x * blockDim.x;
     long start = width * idx * slices,
         middle,
@@ -183,4 +191,13 @@ void merge(long* result, long* left, long* right, long size_left, long size_righ
         merged[k++] = right[j++];
 
     std::copy(merged.begin(), merged.end(), result);
+}
+
+bool compareArrays(long* arr1, long* arr2, long size) {
+    for (long i = 0; i < size; i++) {
+        if (arr1[i] != arr2[i]) {
+            return false;
+        }
+    }
+    return true;
 }
