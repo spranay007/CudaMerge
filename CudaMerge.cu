@@ -130,9 +130,27 @@ __global__ void gpu_mergesort(long* source, long* dest, long size, long width, l
         if (start >= size)
             break;
 
+        // Load data into shared memory
+        long sharedIdx = threadIdx.x;
+        while (sharedIdx < min(start + width, size)) {
+            shared_data[sharedIdx] = source[sharedIdx];
+            sharedIdx += blockDim.x;
+        }
+        __syncthreads();
+
         middle = min(start + (width >> 1), size);
         end = min(start + width, size);
-        gpu_bottomUpMerge(source, dest, start, middle, end);
+        gpu_bottomUpMerge(shared_data, dest, 0, middle - start, end - start);
+        __syncthreads();
+
+        // Write back the sorted data from shared memory to global memory
+        sharedIdx = threadIdx.x;
+        while (sharedIdx < end - start) {
+            dest[start + sharedIdx] = shared_data[sharedIdx];
+            sharedIdx += blockDim.x;
+        }
+        __syncthreads();
+
         start += width;
     }
 }
@@ -150,15 +168,6 @@ __device__ void gpu_bottomUpMerge(long* source, long* dest, long start, long mid
             j++;
         }
     }
-}
-
-long long tm() {
-    static std::chrono::steady_clock::time_point lastTime = std::chrono::steady_clock::now();
-    auto currentTime = std::chrono::steady_clock::now();
-    auto elapsedMicroseconds = std::chrono::duration_cast<std::chrono::microseconds>(currentTime - lastTime);
-    long long t = elapsedMicroseconds.count();
-    lastTime = currentTime;
-    return t;
 }
 
 void cpu_mergesort(long* data, long size) {
