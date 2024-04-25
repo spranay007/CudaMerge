@@ -11,13 +11,10 @@
 #include <algorithm>
 #include <random>
 
-#define THREADS_PER_BLOCK 256
-
-// Helper for main()
-long readList(long**);
+#define THREADS_PER_BLOCK 512
 
 // Data[], size, threads
-void mergesort(long*, long, dim3);
+void mergesort(long*, long, dim3, dim3);
 // A[], B[], size, width, slices
 __global__ void gpu_mergesort(long*, long*, long, long, long);
 __device__ void gpu_bottomUpMerge(long*, long*, long, long, long);
@@ -72,7 +69,7 @@ int main(int argc, char** argv) {
     // GPU Sorting
     auto start_gpu = std::chrono::steady_clock::now();
     // Perform GPU mergesort
-    mergesort(numbers.data(), size, threadsPerBlock);
+    mergesort(numbers.data(), size, threadsPerBlock, blocksPerGrid);
     auto end_gpu = std::chrono::steady_clock::now();
     auto gpu_sort_time = std::chrono::duration_cast<std::chrono::microseconds>(end_gpu - start_gpu).count();
 
@@ -101,16 +98,22 @@ int main(int argc, char** argv) {
     return 0;
 }
 
-void mergesort(long* data, long size, dim3 threadsPerBlock) {
-    long* D_data;
-    long* D_swp;
+void mergesort(long* data, long size, dim3 threadsPerBlock, dim3 blocksPerGrid) {
+    
+    //The GPU mergesort algorithm swaps data between D_data and D_swp as needed during its execution.
+
+    long* D_data;   // input data to be sorted (from the host) is copied, used as the source array for the GPU mergesort algorithm.
+    long* D_swp;    // array in device memory which serves as temporary storage during the sorting process
+    
+    long width_temp = 2;
+    long slices_temp = (size) / (width_temp * THREADS_PER_BLOCK);
 
     checkCudaErrors(cudaMalloc((void**)&D_data, size * sizeof(long)));
     checkCudaErrors(cudaMalloc((void**)&D_swp, size * sizeof(long)));
-
+    // Data from the input array is is coppied from host memory to device memory
     checkCudaErrors(cudaMemcpy(D_data, data, size * sizeof(long), cudaMemcpyHostToDevice));
 
-    gpu_mergesort << <1, threadsPerBlock, size * sizeof(long) >> > (D_data, D_swp, size, 2, 1);
+    gpu_mergesort << <blocksPerGrid, threadsPerBlock, size * sizeof(long) >> > (D_data, D_swp, size, width_temp, slices_temp);
 
     checkCudaErrors(cudaMemcpy(data, D_data, size * sizeof(long), cudaMemcpyDeviceToHost));
 
