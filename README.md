@@ -1,9 +1,6 @@
-# projectThree.cpp
-# convolutionTexture.cu
-# convolutionTexture_common.h
-# convolutionTexture_gold.cpp
+# CudaMerge.cu
 
-The goal of this project is to implement a convolution routine using texture and shared memory in CUDA
+The goal of this project is to implement merge sort algorithm using shared memory in CUDA to make the sorting process faster
 
 ## Platform
 Project created on Windows X64
@@ -18,16 +15,14 @@ Visual Studio 2022
 
 ## Usage
 Sample command to create 
-Image Height: 3072
-Image Width: 3072
-Kernel Length: 18
+To Sort: randomly generated 100000 numbers 
 ******************************************
 ```bash
 cd .\x64\
 cd .\Debug\
 
 # Now in the Debug directory
-./Project_three -i 3072 -j 3072 -k 18
+.\CudaMerge.exe 100000
 ```
 ******************************************
 ## NOTE
